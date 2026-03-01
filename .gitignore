@@ -1,0 +1,19 @@
+# Virtual environment
+venv/
+__pycache__/
+
+# Data folder (DVC managed)
+data/raw/
+!data/raw.dvc
+data/raw/.gitignore
+
+# Local outputs
+mlruns/
+mlflow.db
+heatmap_result.jpg
+best_model.pth
+
+# Python cache
+*.pyc
+*.pyo
+.DS_Store
