@@ -17,3 +17,5 @@ best_model.pth
 *.pyc
 *.pyo
 .DS_Store
+figures/roc_fpr.npy
+figures/roc_tpr.npy
