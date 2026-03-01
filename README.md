@@ -50,6 +50,54 @@ Actual GON+          4         95
 
 > 💡 For context: the average ophthalmologist achieves ~0.94 AUC on this task.
 
+### ROC Curve (Blind Test Set)
+
+![ROC Curve](figures/fig2_roc.png)
+
+> Generated directly from model predictions on the blind test set (patient-level split, seed=42). The red dot marks the operating point at threshold 0.5 — Sensitivity = 0.9596, Specificity = 0.8788.
+
+---
+
+## 🔬 Methodology Deep Dive
+
+### 1. Quality-Aware Preprocessing
+
+Raw fundus images suffer from inconsistent illumination. We apply **CLAHE on the L-channel of CIE LAB** (not RGB) to enhance contrast without distorting color information. Eye-boundary cropping removes black margins to focus computation on clinically relevant tissue.
+
+![CLAHE Preprocessing](figures/fig1_clahe.png)
+
+> **(a)** Original fundus image with dark margins and uneven illumination. **(b)** After CLAHE in LAB color space + eye-boundary cropping — retinal vessels and optic disc are significantly more defined, enabling better feature extraction by the model.
+
+### 2. Zero Data Leakage Strategy
+
+One patient can have multiple fundus images. A naive random split would leak patient identity across train/test sets, inflating metrics artificially. We use:
+
+- `GroupShuffleSplit` → locks 20% of **patients** (not images) as blind test set
+- `GroupKFold` → 5-fold CV on remaining patients by Patient ID
+
+This guarantees no image from a patient in the test set ever appears during training.
+
+### 3. WeightedQualityBCE Loss
+
+Standard BCE ignores two real-world factors: class imbalance and image quality. Our custom loss:
+
+$$\mathcal{L} = -\frac{1}{N}\sum_{i=1}^{N} q_i \left[ w_+ y_i \log\hat{y}_i + (1-y_i)\log(1-\hat{y}_i) \right]$$
+
+Where:
+
+- $q_i = \text{QualityScore}_i / 10$ — higher quality images that are misclassified are penalized more
+- $w_+ = 199/548 \approx 0.363$ — corrects for GON+ majority class bias
+
+> Grounded in the probabilistic cross-entropy framework (Bishop, _Pattern Recognition and Machine Learning_, 2006, Ch. 4).
+
+### 4. Grad-CAM Interpretability
+
+Every prediction comes with a heatmap showing **where** the model is looking. The contrast between GON+ and GON− activations confirms the model has learned clinically meaningful anatomy — not shortcuts or artifacts.
+
+![Grad-CAM Comparison](figures/fig3_gradcam.png)
+
+> **(a,b)** GON+ patient: warm activation concentrates on the **optic disc** — the exact anatomical region used by ophthalmologists to diagnose glaucoma. **(c,d)** GON− patient: activation is diffuse and unfocused, confirming the model does not fabricate pathological signals in healthy eyes. This side-by-side comparison validates clinical alignment of the model's decision process.
+
 ---
 
 ## 🗂️ Repository Structure
@@ -58,17 +106,22 @@ Actual GON+          4         95
 IDSC_2026_Glaucoma/
 ├── src/
 │   ├── data/
-│   │   ├── dataset.py       # GlaucomaDataset — CLAHE, cropping, quality weights
-│   │   └── dataloader.py    # GroupKFold + GroupShuffleSplit splits
+│   │   ├── dataset.py          # GlaucomaDataset — CLAHE, cropping, quality weights
+│   │   └── dataloader.py       # GroupKFold + GroupShuffleSplit splits
 │   └── models/
-│       └── model.py         # EfficientNet-B0 + WeightedQualityBCE loss
-├── train.py                 # Full 5-Fold CV + blind test evaluation
-├── explain.py               # Grad-CAM visualization
-├── download_data.sh         # Auto-download HYGD from PhysioNet
-├── Dockerfile               # Containerized environment
-├── requirements.txt         # Pinned dependencies
+│       └── model.py            # EfficientNet-B0 + WeightedQualityBCE loss
+├── figures/
+│   ├── fig1_clahe.png          # Before/after CLAHE preprocessing
+│   ├── fig2_roc.png            # ROC curve from real model predictions
+│   └── fig3_gradcam.png        # Grad-CAM GON+ vs GON- comparison
+├── train.py                    # Full 5-Fold CV + blind test evaluation
+├── explain.py                  # Grad-CAM visualization
+├── generate_figures.py         # Reproducible figure generation script
+├── download_data.sh            # Auto-download HYGD from PhysioNet
+├── Dockerfile                  # Containerized environment
+├── requirements.txt            # Pinned dependencies
 └── data/
-    └── raw.dvc              # DVC pointer to dataset
+    └── raw.dvc                 # DVC pointer to dataset
 ```
 
 ---
@@ -118,41 +171,12 @@ bash download_data.sh
 # Run training
 python train.py
 
-# Generate Grad-CAM heatmap
+# Generate all paper figures (requires trained model)
+python generate_figures.py
+
+# Generate Grad-CAM heatmap for a single image
 python explain.py
 ```
-
----
-
-## 🔬 Methodology Deep Dive
-
-### 1. Quality-Aware Preprocessing
-
-Raw fundus images suffer from inconsistent illumination. We apply **CLAHE on the L-channel of CIE LAB** (not RGB) to enhance contrast without distorting color information. Eye-boundary cropping removes black margins to focus computation on clinically relevant tissue.
-
-### 2. Zero Data Leakage Strategy
-
-One patient can have multiple fundus images. A naive random split would leak patient identity across train/test sets, inflating metrics artificially. We use:
-
-- `GroupShuffleSplit` → locks 20% of **patients** (not images) as blind test set
-- `GroupKFold` → 5-fold CV on remaining patients by Patient ID
-
-This guarantees no image from a patient in the test set ever appears during training.
-
-### 3. WeightedQualityBCE Loss
-
-Standard BCE ignores two real-world factors: class imbalance and image quality. Our custom loss:
-
-$$\mathcal{L} = -\frac{1}{N}\sum_{i=1}^{N} q_i \left[ w_+ y_i \log\hat{y}_i + (1-y_i)\log(1-\hat{y}_i) \right]$$
-
-Where:
-
-- $q_i = \text{QualityScore}_i / 10$ — higher quality images that are misclassified are penalized more
-- $w_+ = 199/548 \approx 0.363$ — corrects for GON+ majority class bias
-
-### 4. Grad-CAM Interpretability
-
-Every prediction comes with a heatmap showing **where** the model is looking. Our Grad-CAM output correctly localizes on the **optic disc** — the anatomical region used by clinicians for GON diagnosis.
 
 ---
 
@@ -164,7 +188,6 @@ torchvision==0.17.1
 opencv-python==4.9.0.80
 pandas==2.2.1
 scikit-learn==1.4.1.post1
-mlflow==2.11.1
 dvc==3.48.4
 matplotlib==3.8.3
 grad-cam==1.5.0
