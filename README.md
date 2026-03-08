@@ -54,7 +54,7 @@ Actual GON+          4         95
 
 ![ROC Curve](figures/fig2_roc.png)
 
-> Generated directly from model predictions on the blind test set (patient-level split, seed=42). The red dot marks the operating point at threshold 0.5 — Sensitivity = 0.9596, Specificity = 0.8788.
+> Generated directly from model predictions on the blind test set (patient-level split, seed=42). The red dot marks the operating point at threshold 0.5 — dynamically computed from model predictions (Sensitivity = 0.9596, Specificity = 0.8788).
 
 ---
 
@@ -92,7 +92,7 @@ Where:
 
 ### 4. Grad-CAM Interpretability
 
-Every prediction comes with a heatmap showing **where** the model is looking. The contrast between GON+ and GON− activations confirms the model has learned clinically meaningful anatomy — not shortcuts or artifacts.
+Every prediction comes with a heatmap showing **where** the model is looking. For binary classification models with a single output neuron (BCEWithLogitsLoss), Grad-CAM is run with `targets=None` — which correctly uses the raw scalar output rather than a class index. The contrast between GON+ and GON− activations confirms the model has learned clinically meaningful anatomy — not shortcuts or artifacts.
 
 ![Grad-CAM Comparison](figures/fig3_gradcam.png)
 
@@ -168,15 +168,17 @@ pip install -r requirements.txt
 # Download dataset from PhysioNet
 bash download_data.sh
 
-# Run training
+# Run training (produces best_model.pth)
 python train.py
 
-# Generate all paper figures (requires trained model)
+# Generate all paper figures (requires best_model.pth from train.py)
 python generate_figures.py
 
-# Generate Grad-CAM heatmap for a single image
+# Generate Grad-CAM heatmap for a single image (requires best_model.pth from train.py)
 python explain.py
 ```
+
+> ⚠️ **Important:** `generate_figures.py` and `explain.py` both require `best_model.pth` to exist. Always run `python train.py` first.
 
 ---
 
