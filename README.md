@@ -180,6 +180,9 @@ python explain.py
 
 > ⚠️ **Important:** `generate_figures.py` and `explain.py` both require `best_model.pth` to exist. Always run `python train.py` first.
 
+> ⚠️ **PhysioNet requires credentialed access.**
+> Register at https://physionet.org and replace `YOUR_USERNAME` and `YOUR_PASSWORD` in `download_data.sh` before running.
+
 ---
 
 ## 📦 Dependencies
