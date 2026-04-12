@@ -135,8 +135,11 @@ The fastest way to reproduce all results:
 # 1. Build the Docker image
 docker build -t idsc_glaucoma_pipeline .
 
-# 2. Run full training + evaluation (GPU recommended)
-docker run --gpus all -it idsc_glaucoma_pipeline
+# 2a. Run — download dataset via PhysioNet (GPU recommended)
+docker run --gpus all -e PHYSIONET_USER=your_username -e PHYSIONET_PASS=your_password idsc_glaucoma_pipeline
+
+# 2b. Run — dataset already downloaded manually (place hygd.zip in data/raw/)
+docker run --gpus all -v /path/to/data/raw:/app/data/raw idsc_glaucoma_pipeline
 ```
 
 Expected output:
@@ -182,7 +185,7 @@ python explain.py
 > ⚠️ **Important:** `generate_figures.py` and `explain.py` both require `best_model.pth` to exist. Always run `python train.py` first.
 
 > ⚠️ **PhysioNet requires credentialed access.**
-> Register at https://physionet.org and replace `YOUR_USERNAME` and `YOUR_PASSWORD` in `download_data.sh` before running.
+> Register at https://physionet.org and pass your credentials via `-e PHYSIONET_USER` and `-e PHYSIONET_PASS` when running the container.
 
 ---
 

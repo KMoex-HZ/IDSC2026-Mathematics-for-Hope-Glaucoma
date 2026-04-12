@@ -15,6 +15,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN bash download_data.sh
-
-CMD ["python", "train.py"]
+CMD ["bash", "-c", "bash download_data.sh && python train.py"]
